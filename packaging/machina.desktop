@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Machina
+Comment=Local control plane for this laptop
+Exec=/home/h-livv/opt/machina/scripts/machina
+Icon=/home/h-livv/opt/machina/src/machina/assets/machina.svg
+Terminal=false
+Categories=System;Monitor;HardwareSettings;
+StartupWMClass=machina

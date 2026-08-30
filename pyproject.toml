@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "machina"
+version = "0.2.0"
+description = "Local control plane for this Linux laptop"
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [{ name = "Machina" }]
+
+[project.scripts]
+machina = "machina.__main__:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+machina = ["assets/*"]

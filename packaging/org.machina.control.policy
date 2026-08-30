@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE policyconfig PUBLIC
+ "-//freedesktop//DTD PolicyKit Policy Configuration 1.0//EN"
+ "http://www.freedesktop.org/software/polkit/policyconfig.dtd">
+<policyconfig>
+  <vendor>Machina</vendor>
+  <vendor_url>file:///home/h-livv/opt/machina</vendor_url>
+  <action id="org.machina.control.apply">
+    <description>Apply Machina hardware settings</description>
+    <message>Machina wants to change fan, performance, power, or GPU limits on this machine.</message>
+    <defaults>
+      <allow_any>no</allow_any>
+      <allow_inactive>no</allow_inactive>
+      <allow_active>auth_admin_keep</allow_active>
+    </defaults>
+  </action>
+</policyconfig>
