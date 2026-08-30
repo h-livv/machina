@@ -225,7 +225,7 @@ def _default_route() -> str | None:
 
 
 def _listening_ports() -> list[str]:
-    interesting = {11434, 8080, 8000, 8888, 5000, 3000, 5173, 11435}
+    interesting = {11434, 8080, 8000, 8888, 5000, 3000, 5173, 11435, 1900, 1919}
     found: list[str] = []
     for proc_file, ipver in (("/proc/net/tcp", 4), ("/proc/net/tcp6", 6)):
         try:

@@ -22,7 +22,7 @@ A process list with CPU / RAM / GPU / VRAM, terminate / kill / pause, and jobs l
 
 ## Local models
 
-Ollama and llama.cpp: what is installed, what is in VRAM, start/stop/unload, and sampler / context / GPU-layer parameters. On this machine, Ollama weights are expected on Vault; starting Ollama from Machina runs `ollama serve` as you so that path is visible. The system `ollama.service` unit does not see that store.
+Ollama, llama.cpp, and FreeToken: what is installed, what is in VRAM, start/stop/unload. Sampler / context / GPU-layer parameters apply to Ollama and llama.cpp only. On this machine, Ollama weights are expected on Vault; starting Ollama from Machina runs `ollama serve` as you so that path is visible. The system `ollama.service` unit does not see that store. FreeToken is the AppImage in `~/opt/` plus the desktop daemon on localhost:1900 (engine :1919); Machina starts that UI and can stop the engine to free VRAM.
 
 ## The rest
 

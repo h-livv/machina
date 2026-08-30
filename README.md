@@ -12,7 +12,7 @@ It is the one window I leave open instead of juggling `btop`, `nvidia-smi`, Omen
 2. **Change the knobs this firmware actually exposes** — performance profile (cool / quiet / balanced / performance), CPU policy, turbo, RAPL, GPU power cap, backlight. Fans are auto or max only; this HP has no percent curve.
 3. **Let it react when it stays too hot** — warn, then force max fans, then a cooler profile and a lower GPU cap. Off if you do not want unattended writes.
 4. **Handle processes and jobs** — what is using CPU / GPU / VRAM, signal a pid, launch a project task, watch it finish or fail.
-5. **Drive local models** — Ollama and llama.cpp: what is loaded, VRAM, start/stop/unload, sampler / context / GPU layers. On this box, Ollama weights live on Vault; Machina starts `ollama serve` as me so that path is visible.
+5. **Drive local models** — Ollama, llama.cpp, and FreeToken: what is loaded, VRAM, start/stop/unload. Sampler / context / GPU layers are Ollama and llama.cpp only. On this box, Ollama weights live on Vault; Machina starts `ollama serve` as me so that path is visible. FreeToken is the AppImage in `~/opt/`; Machina can start that UI and unload the engine.
 6. **Check disk, network, a few services, and logs** — mounts and a read-only size scan, links and model/dev ports, allowlisted systemd units, audit and events.
 
 Writes that need root go through `pkexec` and an allowlist. Confirmations sit in front of medium/high-risk changes.
@@ -35,7 +35,7 @@ On a different chassis the Apply buttons are the danger. Telemetry might still p
 | [docs/not-for-other-machines.md](docs/not-for-other-machines.md) | Hardcoded paths and limits — required reading if you are not me |
 | [docs/safety.md](docs/safety.md) | What Apply can write, watchdog, audit files |
 
-On this machine: `./scripts/machina`. JSON snapshot, no window: `./scripts/machina --once`.
+On this machine: `./scripts/machina`, or `./scripts/install-desktop.sh` once and launch from the app menu. JSON snapshot, no window: `./scripts/machina --once`.
 
 ## Status
 

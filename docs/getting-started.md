@@ -17,7 +17,7 @@ On Fedora:
 sudo dnf install python3-pyside6
 ```
 
-NVIDIA telemetry uses the driver library when present (`libnvidia-ml`). `nvidia-smi` is only a fallback. Ollama / llama.cpp pages need those stacks only if you use them.
+NVIDIA telemetry uses the driver library when present (`libnvidia-ml`). `nvidia-smi` is only a fallback. Ollama / llama.cpp / FreeToken pages need those stacks only if you use them.
 
 ## Run
 
@@ -37,13 +37,15 @@ One hardware snapshot as JSON, no GUI:
 
 You can also `pip install -e .` from the repo and run `machina` if you prefer an installed script. That is unused on this machine; the `scripts/machina` launcher is the usual path.
 
-## Optional desktop launcher
+## App menu / taskbar
+
+Same pattern as Citehop on this machine:
 
 ```bash
-cp packaging/machina.desktop ~/.local/share/applications/
+./scripts/install-desktop.sh
 ```
 
-The `.desktop` file **hardcodes** `/home/h-livv/opt/machina` for both `Exec` and `Icon`. Change those two lines if the repo is anywhere else, or the launcher will do nothing useful.
+That puts **Machina** in the KDE Application Launcher. Right-click it there → **Pin to Task Manager**. The `.desktop` file hardcodes `/home/h-livv/opt/machina`; change `Exec` if the repo is anywhere else.
 
 ## First launch
 

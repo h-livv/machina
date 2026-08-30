@@ -1,5 +1,18 @@
-#!/usr/bin/env bash
-set -euo pipefail
-ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-export PYTHONPATH="$ROOT/src${PYTHONPATH:+:$PYTHONPATH}"
-exec python3 -m machina "$@"
+#!/usr/bin/env python3
+"""Launch Machina as process `machina` so the taskbar can pin it."""
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+SRC = str(ROOT / "src")
+if SRC not in sys.path:
+    sys.path.insert(0, SRC)
+
+sys.argv[0] = "machina"
+
+from machina.__main__ import main
+
+if __name__ == "__main__":
+    raise SystemExit(main())

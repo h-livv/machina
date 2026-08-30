@@ -71,6 +71,14 @@ class ModelHub:
     llama_models: list[str] = field(default_factory=list)
     models_dir: str | None = None
     llama_models_dir: str | None = None
+    freetoken_installed: bool = False
+    freetoken_running: bool = False
+    freetoken_ui: bool = False
+    freetoken_engine: bool = False
+    freetoken_version: str | None = None
+    freetoken_error: str | None = None
+    freetoken_models_dir: str | None = None
+    freetoken_model: str | None = None
     note: str = ""
     ts: float = 0.0
     gen_tok_s: float | None = None
@@ -91,6 +99,7 @@ def collect_models() -> ModelHub:
         llama_models_dir=llama_dir,
         ts=time.time(),
     )
+    disk_note = ""
     if ollama_bin:
         ok, data, err = http_json(f"{OLLAMA_BASE}/api/version", timeout=0.8)
         if ok and isinstance(data, dict):
@@ -102,19 +111,14 @@ def collect_models() -> ModelHub:
             hub.ollama_error = err or "Ollama API is not reachable"
             if models_dir:
                 hub.models = _models_from_disk(models_dir)
-                hub.note = f"Ollama is installed but not serving. {len(hub.models)} models on disk at {models_dir}."
+                disk_note = (
+                    f"Ollama is installed but not serving. {len(hub.models)} models on disk at {models_dir}."
+                )
             else:
-                hub.note = "Ollama is installed but not serving."
+                disk_note = "Ollama is installed but not serving."
     _fill_llama(hub)
-    ollama_loaded = [m for m in hub.loaded if not is_llama_source(m.source)]
-    if not hub.ollama_running and not hub.llama_running:
-        if hub.ollama_installed:
-            hub.note = hub.note or "No local model server is listening."
-    elif hub.ollama_running and ollama_loaded:
-        names = ", ".join(m.name for m in ollama_loaded)
-        hub.note = f"Ollama has loaded: {names}"
-    elif hub.ollama_running:
-        hub.note = "Ollama is idle — no model is resident in VRAM."
+    _fill_freetoken(hub)
+    hub.note = _compose_note(hub, disk_note)
     refresh_generation_rate(hub)
     return hub
 
@@ -181,6 +185,110 @@ def ollama_layer_count(name: str) -> int | None:
 
 def is_llama_source(source: str | None) -> bool:
     return (source or "").lower().replace(" ", "") in {"llama.cpp", "llama", "llamacpp"}
+
+
+def is_freetoken_source(source: str | None) -> bool:
+    return (source or "").lower().replace(" ", "") in {"freetoken", "ft"}
+
+
+def _fill_freetoken(hub: ModelHub) -> None:
+    from machina.freetoken import (
+        appimage_path,
+        daemon_health,
+        desktop_config,
+        engine_status,
+        list_weights,
+        model_basename,
+        models_dir,
+        ui_running,
+    )
+
+    root = models_dir()
+    hub.freetoken_models_dir = str(root)
+    image = appimage_path()
+    weights = list_weights(root)
+    seen = {m.name for m in hub.models}
+    for weight in weights:
+        name = str(weight.get("name") or "")
+        if not name or name in seen:
+            continue
+        hub.models.append(ModelWeight(name=name, size_b=None, family="freetoken", source="freetoken"))
+        seen.add(name)
+
+    health = daemon_health()
+    hub.freetoken_running = bool(health.get("ok"))
+    hub.freetoken_version = health.get("version") if hub.freetoken_running else None
+    hub.freetoken_ui = ui_running()
+    hub.freetoken_installed = bool(image or hub.freetoken_running or weights)
+    if not hub.freetoken_running:
+        if hub.freetoken_installed:
+            hub.freetoken_error = str(health.get("error") or "FreeToken daemon is not reachable")
+        else:
+            hub.freetoken_error = "FreeToken AppImage not found"
+        return
+
+    status = engine_status()
+    if status.get("error") and not status.get("running"):
+        hub.freetoken_error = str(status.get("error"))
+        return
+    name = model_basename(status.get("model") if isinstance(status.get("model"), str) else None)
+    last = desktop_config().get("lastActiveId")
+    hub.freetoken_model = name or (str(last) if isinstance(last, str) and last else None)
+    busy = bool(status.get("running") or status.get("starting") or status.get("stopping"))
+    hub.freetoken_engine = busy
+    if not busy:
+        return
+    phase = "engine"
+    if status.get("starting"):
+        phase = "starting"
+    elif status.get("stopping"):
+        phase = "stopping"
+    pid = status.get("pid")
+    processor = f"{phase} pid {pid}" if pid else phase
+    uptime = status.get("uptime_s")
+    expires = f"up {int(uptime)}s" if isinstance(uptime, (int, float)) and uptime else None
+    shown = name or "freetoken"
+    hub.loaded.append(
+        LoadedModel(
+            name=shown,
+            size_vram_b=None,
+            size_b=None,
+            expires=expires,
+            processor=processor,
+            context_length=None,
+            source="freetoken",
+        )
+    )
+
+
+def _compose_note(hub: ModelHub, disk_note: str) -> str:
+    bits: list[str] = []
+    if disk_note:
+        bits.append(disk_note)
+    ollama_loaded = [
+        m for m in hub.loaded if not is_llama_source(m.source) and not is_freetoken_source(m.source)
+    ]
+    if hub.ollama_running and ollama_loaded:
+        bits.append("Ollama has loaded: " + ", ".join(m.name for m in ollama_loaded))
+    elif hub.ollama_running:
+        bits.append("Ollama is idle — no model is resident in VRAM.")
+    elif not hub.ollama_running and hub.ollama_installed and not disk_note:
+        bits.append("Ollama is installed but not serving.")
+    if hub.llama_running:
+        names = ", ".join(hub.llama_models) if hub.llama_models else "llama serve"
+        bits.append(f"llama.cpp: {names}")
+    if hub.freetoken_engine:
+        bits.append(f"FreeToken engine: {hub.freetoken_model or 'running'}")
+    elif hub.freetoken_running:
+        last = f" (last {hub.freetoken_model})" if hub.freetoken_model else ""
+        bits.append(f"FreeToken daemon is up; engine idle{last}")
+    elif hub.freetoken_ui:
+        bits.append("FreeToken UI is running")
+    elif hub.freetoken_error and hub.freetoken_installed:
+        bits.append(hub.freetoken_error)
+    if not bits and hub.ollama_installed and not hub.ollama_running and not hub.llama_running:
+        bits.append("No local model server is listening.")
+    return "  ·  ".join(bits)
 
 
 def _fill_llama(hub: ModelHub) -> None:

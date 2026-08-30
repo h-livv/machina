@@ -1,9 +1,16 @@
 [Desktop Entry]
 Type=Application
+Version=1.0
 Name=Machina
-Comment=Local control plane for this laptop
+GenericName=Laptop control plane
+Comment=Local telemetry, power, fans, and models for this HP Victus
 Exec=/home/h-livv/opt/machina/scripts/machina
-Icon=/home/h-livv/opt/machina/src/machina/assets/machina.svg
+Path=/home/h-livv/opt/machina
+Icon=/home/h-livv/.local/share/icons/hicolor/128x128/apps/machina.png
 Terminal=false
-Categories=System;Monitor;HardwareSettings;
+StartupNotify=true
 StartupWMClass=machina
+X-KDE-WMClass=machina
+SingleMainWindow=true
+Categories=System;Monitor;HardwareSettings;
+Keywords=cpu;gpu;fans;ollama;nvidia;telemetry;power;

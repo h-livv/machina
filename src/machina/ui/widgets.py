@@ -21,12 +21,22 @@ from PySide6.QtWidgets import (
 from machina.ui.theme import ACCENT, BG_CARD, BORDER, DANGER, TEXT, TEXT_DIM, TEXT_MUTED, WARN
 
 
-def card(*widgets: QWidget, title: str | None = None, subtitle: str | None = None) -> QFrame:
+def card(
+    *widgets: QWidget,
+    title: str | None = None,
+    subtitle: str | None = None,
+    expand: bool = False,
+    compact: bool = False,
+) -> QFrame:
     frame = QFrame()
     frame.setObjectName("card")
     layout = QVBoxLayout(frame)
-    layout.setContentsMargins(16, 16, 16, 16)
-    layout.setSpacing(10)
+    if compact:
+        layout.setContentsMargins(12, 10, 12, 10)
+        layout.setSpacing(6)
+    else:
+        layout.setContentsMargins(16, 16, 16, 16)
+        layout.setSpacing(10)
     if title:
         label = QLabel(title)
         label.setObjectName("section")
@@ -37,8 +47,11 @@ def card(*widgets: QWidget, title: str | None = None, subtitle: str | None = Non
         sub.setObjectName("muted")
         sub.setWordWrap(True)
         layout.addWidget(sub)
-    for widget in widgets:
-        layout.addWidget(widget)
+    for i, widget in enumerate(widgets):
+        stretch = 1 if expand and i == 0 else 0
+        layout.addWidget(widget, stretch)
+    if expand:
+        frame.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
     return frame
 
 
@@ -214,8 +227,11 @@ class Kpi(QFrame):
         layout.setContentsMargins(14, 12, 14, 12)
         self.value_lbl = QLabel("—")
         self.value_lbl.setObjectName("kpiValue")
+        self.value_lbl.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
         self.meta = QLabel(label)
         self.meta.setObjectName("muted")
+        self.meta.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
+        self.meta.setWordWrap(False)
         layout.addWidget(self.value_lbl)
         layout.addWidget(self.meta)
 

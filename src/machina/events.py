@@ -61,12 +61,14 @@ class EventLog:
                 add("hardware", f"Fan mode → {snap.fans.mode_label}", f"{prev.snap.fans.mode} → {snap.fans.mode}", "info", f"fan-{snap.fans.mode}", 5)
             if (prev.snap.profile.current or "") != (snap.profile.current or ""):
                 add("hardware", f"Profile → {snap.profile.current}", "ACPI platform profile changed.", "info", f"profile-{snap.profile.current}", 5)
-            prev_loaded = {m.name for m in prev.models.loaded}
-            cur_loaded = {m.name for m in cur.models.loaded}
+            prev_loaded = {m.name for m in (prev.models.loaded if prev.models else [])}
+            cur_loaded = {m.name for m in (cur.models.loaded if cur.models else [])}
             for name in cur_loaded - prev_loaded:
-                add("model", f"Model loaded: {name}", "Ollama resident model changed.", "info", f"load-{name}", 5)
+                src = next((m.source for m in cur.models.loaded if m.name == name), "")
+                add("model", f"Model loaded: {name}", f"{src or 'local'} resident model changed.", "info", f"load-{name}", 5)
             for name in prev_loaded - cur_loaded:
-                add("model", f"Model unloaded: {name}", "Ollama resident model changed.", "info", f"unload-{name}", 5)
+                src = next((m.source for m in prev.models.loaded if m.name == name), "")
+                add("model", f"Model unloaded: {name}", f"{src or 'local'} resident model changed.", "info", f"unload-{name}", 5)
             prev_jobs = {j.id: j.status for j in prev.jobs}
             for job in cur.jobs:
                 was = prev_jobs.get(job.id)
@@ -77,10 +79,19 @@ class EventLog:
             for svc in cur.services:
                 if prev_svc.get(svc.unit) == "active" and svc.active != "active":
                     add("service", f"{svc.unit} stopped", f"state={svc.active}/{svc.sub}", "warn", f"svc-{svc.unit}", 15)
-            if prev.models.ollama_running and not cur.models.ollama_running:
-                add("service", "Ollama API went away", cur.models.ollama_error or "", "warn", "ollama-down", 20)
-            if not prev.models.ollama_running and cur.models.ollama_running:
-                add("service", "Ollama API is up", cur.models.ollama_version or "", "info", "ollama-up", 10)
+            if prev.models and cur.models:
+                if prev.models.ollama_running and not cur.models.ollama_running:
+                    add("service", "Ollama API went away", cur.models.ollama_error or "", "warn", "ollama-down", 20)
+                if not prev.models.ollama_running and cur.models.ollama_running:
+                    add("service", "Ollama API is up", cur.models.ollama_version or "", "info", "ollama-up", 10)
+                if prev.models.freetoken_running and not cur.models.freetoken_running:
+                    add("service", "FreeToken daemon went away", cur.models.freetoken_error or "", "warn", "freetoken-down", 20)
+                if not prev.models.freetoken_running and cur.models.freetoken_running:
+                    add("service", "FreeToken daemon is up", cur.models.freetoken_version or "", "info", "freetoken-up", 10)
+                if prev.models.freetoken_ui and not cur.models.freetoken_ui:
+                    add("service", "FreeToken UI closed", "", "info", "freetoken-ui-down", 15)
+                if not prev.models.freetoken_ui and cur.models.freetoken_ui:
+                    add("service", "FreeToken UI is up", "", "info", "freetoken-ui-up", 10)
             gpu_ok_prev = prev.snap.sources.get("gpu")
             gpu_ok_cur = snap.sources.get("gpu")
             if gpu_ok_prev and gpu_ok_prev.ok and gpu_ok_cur and not gpu_ok_cur.ok:

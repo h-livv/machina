@@ -13,10 +13,10 @@ You will have to change at least:
 | Chassis | HP Victus 15, `hp-wmi` fans (`pwm1_enable` auto vs max), ACPI profiles `cool` / `quiet` / `balanced` / `performance` |
 | CPU | Intel P-state, RAPL PL1 15–45 W, PL2 30–90 W (this 13420H) |
 | GPU | NVIDIA, power cap 30–75 W, OEM default 60 W, `nvidia-smi` / NVML |
-| Desktop launcher | `Exec` and `Icon` are `/home/h-livv/opt/machina/...` |
+| Desktop launcher | `Exec` is `/home/h-livv/opt/machina/scripts/machina`; icon is a generated PNG under `~/.local/share/icons` |
 | Projects | `~/Projects`, `~/Labs`, `~/opt/machina` |
 | Disk scan | those trees plus `~/models-gguf`, `~/Downloads`, `~/.ollama`, and **`/run/media/h-livv`** (Vault) |
-| Models | Vault Ollama store, `llama serve` on localhost |
+| Models | Vault Ollama store, `llama serve` on localhost, FreeToken AppImage under `~/opt/` and Vault `/freetoken` |
 | Jobs | command hints for this machine’s experiments (`geant4`, `sgl_`, `collision/run.py`, …) |
 | Services | `ollama.service`, `docker.service`, `nvidia-powerd.service` |
 | Polkit policy | `vendor_url` points at `/home/h-livv/opt/machina` |

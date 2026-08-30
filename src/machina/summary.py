@@ -71,11 +71,20 @@ def interpret(
         vram = ""
         if gpu.mem_used_mib is not None:
             vram = f"{gpu.mem_used_mib / 1024:.1f} GB VRAM in use." if gpu.mem_used_mib >= 1024 else f"{gpu.mem_used_mib:.0f} MiB VRAM in use."
-        loaded = [m for m in models.loaded if m.source != "llama.cpp"]
+        loaded = list(models.loaded)
         gpu_procs = [p for p in processes if p.gpu_vram_mib]
         if loaded:
-            names = ", ".join(m.name for m in loaded)
-            lines.append(f"GPU currently running Ollama ({names}).")
+            parts = []
+            for model in loaded:
+                kind = model.source or "model"
+                if kind == "llama.cpp":
+                    kind = "llama.cpp"
+                elif kind == "freetoken":
+                    kind = "FreeToken"
+                elif kind in {"ollama", "disk"}:
+                    kind = "Ollama"
+                parts.append(f"{kind} ({model.name})")
+            lines.append("GPU currently running " + "; ".join(parts) + ".")
             if vram:
                 lines.append(vram)
         elif gpu.util is not None and gpu.util >= 15:

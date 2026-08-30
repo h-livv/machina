@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
+from machina.freetoken import log_path as freetoken_log_path
 from machina.jobs import Job
 from machina.models import llama_log_path, ollama_log_path
 from machina.paths import audit_path, events_path, jobs_dir, logs_dir
@@ -35,6 +36,7 @@ def list_sources(jobs: list[Job] | None = None) -> list[LogSource]:
         LogSource("machina-events", "Machina events", "file", str(events_path()), None, "Control-plane events"),
         LogSource("ollama-file", "Ollama (Machina-spawned)", "file", str(ollama_log_path()), None, "Only if Machina started ollama serve"),
         LogSource("llama-file", "llama.cpp serve", "file", str(llama_log_path()), None, "Only if Machina started llama serve"),
+        LogSource("freetoken-file", "FreeToken UI", "file", str(freetoken_log_path()), None, "Launch log if Machina started the AppImage"),
         LogSource("journal-ollama", "Ollama systemd", "journal", None, "ollama.service", "system journal"),
         LogSource("journal-nvidia", "nvidia-powerd", "journal", None, "nvidia-powerd.service"),
         LogSource("journal-docker", "Docker", "journal", None, "docker.service"),

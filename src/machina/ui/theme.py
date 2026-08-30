@@ -206,6 +206,15 @@ QHeaderView::section {{
     border: none;
     padding: 8px;
 }}
+QSplitter::handle:horizontal {{
+    background: {BORDER};
+    width: 8px;
+    margin: 12px 1px;
+    border-radius: 4px;
+}}
+QSplitter::handle:horizontal:hover {{
+    background: {BORDER_STRONG};
+}}
 QProgressBar {{
     background: {BG_INPUT};
     border: none;

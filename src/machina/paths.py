@@ -72,3 +72,7 @@ def model_params_path() -> Path:
 
 def llama_preset_path() -> Path:
     return config_dir() / "llama-preset.ini"
+
+
+def models_ui_path() -> Path:
+    return config_dir() / "models-ui.json"

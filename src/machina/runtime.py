@@ -16,6 +16,7 @@ from machina.jobs import job_manager
 from machina.models import (
     LLAMA_BASE,
     OLLAMA_BASE,
+    is_freetoken_source,
     is_llama_source,
     llama_log_path,
     ollama_log_path,
@@ -63,12 +64,22 @@ def dispatch(kind: str, payload: dict[str, Any]) -> RuntimeResult:
             return start_ollama()
         if kind == "model.stop_ollama":
             return stop_ollama()
+        if kind == "model.start_freetoken":
+            return start_freetoken_ui()
         if kind == "model.load":
             name = str(payload["name"])
-            if is_llama_source(str(payload.get("source") or "")):
+            source = str(payload.get("source") or "")
+            if is_freetoken_source(source):
+                return RuntimeResult(
+                    False,
+                    "Load FreeToken models in the FreeToken UI. Machina only starts the desktop and unloads the engine.",
+                )
+            if is_llama_source(source):
                 return llama_load_with_params(name)
             return ollama_load(name)
         if kind == "model.load_max_gpu":
+            if is_freetoken_source(str(payload.get("source") or "")):
+                return RuntimeResult(False, "FreeToken has no Machina GPU-layer probe.")
             return load_max_gpu(
                 str(payload["name"]),
                 str(payload.get("source") or ""),
@@ -76,6 +87,8 @@ def dispatch(kind: str, payload: dict[str, Any]) -> RuntimeResult:
             )
         if kind == "model.unload":
             name = str(payload["name"])
+            if is_freetoken_source(str(payload.get("source") or "")):
+                return freetoken_unload(name)
             if is_llama_source(str(payload.get("source") or "")):
                 return llama_unload(name)
             return ollama_unload(name)
@@ -271,6 +284,8 @@ def apply_model_params(payload: dict[str, Any], *, write: bool) -> RuntimeResult
     if not name:
         return RuntimeResult(False, "No model selected.")
     source = str(payload.get("source") or "")
+    if is_freetoken_source(source):
+        return RuntimeResult(False, "FreeToken has no Machina parameter editor.")
     raw = payload.get("params")
     if not isinstance(raw, dict):
         return RuntimeResult(False, "Missing parameter payload.")
@@ -393,7 +408,7 @@ def ollama_unload(name: str) -> RuntimeResult:
 
 
 def unload_resident() -> RuntimeResult:
-    """Drop whatever is currently in VRAM (ollama ps + llama.cpp loaded)."""
+    """Drop whatever is currently in VRAM (ollama ps + llama.cpp loaded + FreeToken engine)."""
     names: list[str] = []
     ok, data, _ = http_json(f"{OLLAMA_BASE}/api/ps", timeout=1.5)
     if ok and isinstance(data, dict):
@@ -419,9 +434,66 @@ def unload_resident() -> RuntimeResult:
             if name and str(status or "") in {"loaded", "loading", "sleeping", "running"}:
                 llama_unload(name)
                 names.append(name)
+    ft = freetoken_unload_result()
+    if ft.get("error"):
+        extra = str(ft["error"])
+        if names:
+            return RuntimeResult(False, f"Unloaded {', '.join(names)}, but FreeToken: {extra}")
+        return RuntimeResult(False, extra)
+    if ft.get("stopped") and not ft.get("already"):
+        names.append(str(ft.get("model") or "freetoken"))
     if not names:
         return RuntimeResult(True, "No model is resident in VRAM.")
     return RuntimeResult(True, f"Unloaded from VRAM: {', '.join(names)}.")
+
+
+def start_freetoken_ui() -> RuntimeResult:
+    import subprocess
+
+    from machina.freetoken import appimage_path, log_path, ui_running
+
+    if ui_running():
+        return RuntimeResult(True, "FreeToken UI is already running.")
+    image = appimage_path()
+    if image is None:
+        return RuntimeResult(
+            False,
+            "FreeToken AppImage not found. Expected ~/opt/freetoken-desktop*.appimage (or FREETOKEN_APPIMAGE).",
+        )
+    log = log_path()
+    try:
+        log.parent.mkdir(parents=True, exist_ok=True)
+        with log.open("a", encoding="utf-8") as handle:
+            handle.write(f"\n$ {image}\n")
+            handle.flush()
+        proc = subprocess.Popen(
+            [str(image)],
+            cwd=str(image.parent),
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            start_new_session=True,
+        )
+    except OSError as exc:
+        return RuntimeResult(False, str(exc))
+    return RuntimeResult(True, f"Started FreeToken UI as pid {proc.pid}.")
+
+
+def freetoken_unload(name: str = "") -> RuntimeResult:
+    result = freetoken_unload_result()
+    if result.get("error"):
+        return RuntimeResult(False, str(result["error"]))
+    if result.get("skipped"):
+        return RuntimeResult(True, "FreeToken daemon is not reachable.")
+    shown = name or result.get("model") or "freetoken"
+    if result.get("already"):
+        return RuntimeResult(True, f"FreeToken engine was not running ({shown}).")
+    return RuntimeResult(True, f"Stopped FreeToken engine ({shown}).")
+
+
+def freetoken_unload_result() -> dict:
+    from machina.freetoken import stop_engine
+
+    return stop_engine()
 
 
 def _llama_reachable(timeout: float = 0.5) -> bool:
@@ -534,6 +606,8 @@ def load_max_gpu(name: str, source: str = "", *, force: bool = False) -> Runtime
         resolve_llama_gguf,
     )
 
+    if is_freetoken_source(source):
+        return RuntimeResult(False, "FreeToken has no Machina GPU-layer probe.")
     if is_llama_source(source):
         path = resolve_llama_gguf(name)
         if path is None:

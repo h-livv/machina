@@ -19,7 +19,7 @@ from PySide6.QtWidgets import (
 
 from machina.gpu_layers import remembered_gpu_layers
 from machina.model_params import ModelParams, from_show, history_enabled
-from machina.models import is_llama_source
+from machina.models import is_freetoken_source, is_llama_source
 from machina.state import HostState
 from machina.ui.pages import Page
 from machina.ui.widgets import muted
@@ -28,6 +28,8 @@ from machina.ui.widgets import muted
 def _combo_label(name: str, source: str) -> str:
     if is_llama_source(source):
         return f"{name}  ·  llama.cpp"
+    if is_freetoken_source(source):
+        return f"{name}  ·  freetoken"
     return name
 
 
@@ -157,6 +159,8 @@ class ParametersPage(Page):
             name = (model.name or "").strip()
             if not name:
                 continue
+            if is_freetoken_source(model.source):
+                continue
             key = (name, _norm_source(model.source))
             if key in seen:
                 continue
@@ -164,8 +168,11 @@ class ParametersPage(Page):
             entries.append(key)
         resident: tuple[str, str] | None = None
         if hub.loaded:
-            first = hub.loaded[0]
-            resident = (first.name, _norm_source(first.source))
+            first = next((m for m in hub.loaded if not is_freetoken_source(m.source)), hub.loaded[0])
+            if is_freetoken_source(first.source):
+                resident = None
+            else:
+                resident = (first.name, _norm_source(first.source))
         self._set_status(resident)
         if self._gpu_refresh:
             self._sync_gpu_spin()

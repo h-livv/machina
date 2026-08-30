@@ -186,8 +186,10 @@ class MainWindow(QMainWindow):
             scroll = QScrollArea()
             scroll.setWidgetResizable(True)
             scroll.setFrameShape(QFrame.Shape.NoFrame)
-            if name in {"Overview", "Parameters"}:
+            if name in {"Overview", "Parameters", "Models"}:
                 scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+            if name == "Models":
+                scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
             scroll.setWidget(page)
             self.stack.addWidget(scroll)
             self.pages.append((name, page))
@@ -502,13 +504,24 @@ def _runtime_risk(kind: str, payload: dict[str, Any]) -> tuple[str, str, list[st
         return "medium", "Write model parameters", [name, "ollama create FROM this tag"]
     if kind in {"model.stop_ollama", "model.stop_llama", "model.unload", "model.unload_resident"}:
         return "medium", "Stop model server", [kind, str(payload.get("name") or "")]
+    if kind == "model.start_freetoken":
+        return "low", "Start FreeToken UI", ["~/opt/freetoken-desktop AppImage"]
     return "low", "Runtime action", [kind]
 
 
 def run_app() -> int:
+    from PySide6.QtGui import QGuiApplication
+
+    sys.argv[0] = "machina"
+    QGuiApplication.setDesktopFileName("machina")
     app = QApplication(sys.argv)
-    app.setApplicationName("Machina")
+    app.setApplicationName("machina")
+    app.setApplicationDisplayName("Machina")
     app.setOrganizationName("Machina")
+    app.setDesktopFileName("machina")
+    icon = icon_path()
+    if icon.exists():
+        app.setWindowIcon(QIcon(str(icon)))
     compress = getattr(Qt.ApplicationAttribute, "AA_CompressHighFrequencyEvents", None)
     if compress is not None:
         app.setAttribute(compress, True)
