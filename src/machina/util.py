@@ -120,11 +120,11 @@ def http_json(
     except (urllib.error.URLError, TimeoutError, OSError) as exc:
         return False, None, str(exc)
     if not raw.strip():
-        return True, None, ""
+        return False, None, "empty response"
     try:
         return True, json.loads(raw), ""
     except json.JSONDecodeError:
-        return True, raw, ""
+        return False, None, (raw[:240] or "non-JSON response")
 
 
 def fmt_bytes(n: int | float | None) -> str:

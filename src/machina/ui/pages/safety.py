@@ -6,6 +6,7 @@ from PySide6.QtWidgets import (
     QCheckBox,
     QHBoxLayout,
     QLabel,
+    QMessageBox,
     QPushButton,
     QSpinBox,
     QTableWidget,
@@ -15,7 +16,7 @@ from PySide6.QtWidgets import (
 )
 
 from machina import audit
-from machina.guardrails import SAFE_RESTORE, load_guardrails, save_guardrails
+from machina.guardrails import SAFE_RESTORE, load_guardrails, save_guardrails, thresholds_ordered
 from machina.telemetry import Snapshot
 from machina.ui.pages import Page
 from machina.ui.widgets import card, muted
@@ -83,15 +84,23 @@ class SafetyPage(Page):
         self.refresh_log()
 
     def _save(self) -> None:
+        warn, trip, crit = self.warn.value(), self.trip.value(), self.crit.value()
+        if not thresholds_ordered(warn, trip, crit):
+            QMessageBox.warning(
+                self,
+                "Invalid thresholds",
+                "Warn °C must be less than Trip °C, which must be less than Critical °C.",
+            )
+            return
         cfg = load_guardrails()
         cfg.update(
             {
                 "watchdog_enabled": self.watchdog.isChecked(),
                 "confirm_medium": self.confirm_med.isChecked(),
                 "confirm_high": True,
-                "warn_temp_c": self.warn.value(),
-                "trip_temp_c": self.trip.value(),
-                "critical_temp_c": self.crit.value(),
+                "warn_temp_c": warn,
+                "trip_temp_c": trip,
+                "critical_temp_c": crit,
             }
         )
         save_guardrails(cfg)

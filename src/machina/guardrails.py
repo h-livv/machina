@@ -29,6 +29,11 @@ DEFAULTS: dict[str, Any] = {
     "max_fan_warning": True,
 }
 
+
+def thresholds_ordered(warn: float, trip: float, critical: float) -> bool:
+    return warn < trip < critical
+
+
 PROFILE_BUNDLES: dict[str, dict[str, Any]] = {
     "cool": {
         "title": "Cool",

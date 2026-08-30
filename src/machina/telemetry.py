@@ -877,14 +877,29 @@ class Sampler:
                 "cpu_power", False, now, "energy_uj is root-only", stale=False
             )
         else:
-            sources["cpu_power"] = SourceStatus("cpu_power", True, now, None, stale=False)
+            sources["cpu_power"] = SourceStatus(
+                "cpu_power", power.package_power_w is not None, now, None, stale=False
+            )
 
         memory = _collect_memory()
         throttle = _collect_throttle(self._throttle)
         self._throttle = throttle
-        sources["cpu"] = SourceStatus("cpu", True, now, None, stale=False)
+        battery = _collect_battery()
+        sources["cpu"] = SourceStatus(
+            "cpu",
+            cpu.package_temp_c is not None or cpu.usage is not None,
+            now,
+            None,
+            stale=False,
+        )
         sources["fans"] = SourceStatus("fans", fans.present, now, None if fans.present else fans.note, stale=False)
-        sources["battery"] = SourceStatus("battery", True, now, None, stale=False)
+        sources["battery"] = SourceStatus(
+            "battery",
+            (not battery.present) or battery.percent is not None,
+            now,
+            None if battery.present else "no battery",
+            stale=False,
+        )
 
         return Snapshot(
             ts=now,
@@ -894,7 +909,7 @@ class Sampler:
             igpu=_collect_igpu(),
             fans=fans,
             thermals=_collect_thermals(),
-            battery=_collect_battery(),
+            battery=battery,
             power=power,
             profile=_collect_profile(),
             backlight=_collect_backlight(),

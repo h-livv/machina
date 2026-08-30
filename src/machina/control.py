@@ -71,38 +71,45 @@ def apply_actions(actions: list[dict[str, Any]], reason: str = "user") -> ApplyR
     if leftover:
         elevated = _pkexec_apply(leftover)
         details.extend(elevated.details)
+        cancelled = elevated.cancelled
+        if cancelled:
+            ok = False
+            message = (
+                "Authorization cancelled — some writes already applied."
+                if attempt["done"]
+                else "Authorization cancelled — nothing changed."
+            )
+            raw: dict[str, Any] = elevated.raw
+        elif errors:
+            ok = False
+            message = errors[0].get("detail", "Partial failure")
+            raw = {"unprivileged_errors": errors, **elevated.raw} if elevated.ok else elevated.raw
+        else:
+            ok = bool(elevated.ok)
+            message = elevated.message
+            raw = elevated.raw
+            if ok and any("FAIL " in d for d in details):
+                ok = False
+                message = next(d for d in details if "FAIL " in d)
         audit.log_event(
             {
                 "reason": reason,
                 "actions": actions,
-                "ok": elevated.ok and not errors,
+                "ok": ok,
                 "privileged": True,
-                "cancelled": elevated.cancelled,
-                "message": elevated.message,
+                "cancelled": cancelled,
+                "message": message,
                 "unprivileged_done": attempt["done"],
                 "errors": errors + elevated.raw.get("errors", []),
             }
         )
-        if errors and elevated.ok:
-            return ApplyResult(
-                False,
-                True,
-                elevated.cancelled,
-                errors[0].get("detail", "Partial failure"),
-                details,
-                {"unprivileged_errors": errors, **elevated.raw},
-            )
-        return ApplyResult(
-            elevated.ok and not errors,
-            True,
-            elevated.cancelled,
-            elevated.message if not errors else errors[0].get("detail", elevated.message),
-            details,
-            elevated.raw,
-        )
+        return ApplyResult(ok, True, cancelled, message, details, raw)
 
     ok = not errors
     message = "Applied without elevation." if ok else errors[0].get("detail", "Failed")
+    if ok and any("FAIL " in d for d in details):
+        ok = False
+        message = next(d for d in details if "FAIL " in d)
     audit.log_event(
         {
             "reason": reason,

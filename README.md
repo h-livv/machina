@@ -8,14 +8,14 @@ It is the one window I leave open instead of juggling `btop`, `nvidia-smi`, Omen
 
 ## What you can do with it
 
-1. **See what the laptop is doing** — CPU, GPU, fans, thermals, battery, RAM, and a short status line. Missing sensors are labeled, not faked.
+1. **See what the laptop is doing** — CPU, GPU, fans, thermals, battery, RAM, and a short status line. Missing or unreadable sensors are marked not-ok, not invented. CPU package watts stay absent on this kernel (`energy_uj` is root-only).
 2. **Change the knobs this firmware actually exposes** — performance profile (cool / quiet / balanced / performance), CPU policy, turbo, RAPL, GPU power cap, backlight. Fans are auto or max only; this HP has no percent curve.
-3. **Let it react when it stays too hot** — warn, then force max fans, then a cooler profile and a lower GPU cap. Off if you do not want unattended writes.
+3. **Let it react when it stays too hot** — warn, then force max fans, then a cooler profile and a lower GPU cap. Off if you do not want unattended writes. It uses package and GPU temperature only.
 4. **Handle processes and jobs** — what is using CPU / GPU / VRAM, signal a pid, launch a project task, watch it finish or fail.
-5. **Drive local models** — Ollama, llama.cpp, and FreeToken: what is loaded, VRAM, start/stop/unload. Sampler / context / GPU layers are Ollama and llama.cpp only. On this box, Ollama weights live on Vault; Machina starts `ollama serve` as me so that path is visible. FreeToken is the AppImage in `~/opt/`; Machina can start that UI and unload the engine.
+5. **Drive local models** — Ollama, llama.cpp, and FreeToken: what is loaded, VRAM, start/stop/unload. Sampler / context / GPU layers are Ollama and llama.cpp only. Start waits until the API answers. On this box, Ollama weights live on Vault; Machina starts `ollama serve` as me so that path is visible. FreeToken is the AppImage in `~/opt/`; Machina can start that UI and unload the engine.
 6. **Check disk, network, a few services, and logs** — mounts and a read-only size scan, links and model/dev ports, allowlisted systemd units, audit and events.
 
-Writes that need root go through `pkexec` and an allowlist. Confirmations sit in front of medium/high-risk changes.
+Writes that need root go through `pkexec` and an allowlist. Confirmations sit in front of medium/high-risk changes (high-risk also needs an extra checkbox). Apply and model start report failure instead of pretending success when a write, restore step, or server never actually came up. The watchdog is on by default; it waits a few seconds after launch and only then writes after a hot streak.
 
 ## Which machine this is for
 
@@ -25,17 +25,32 @@ It fits when the firmware is HP `hp-wmi` (those four profiles, auto/max fans), I
 
 On a different chassis the Apply buttons are the danger. Telemetry might still paint; the watt and fan numbers are this laptop’s.
 
+## Run
+
+From the repo root:
+
+| Command | What it does |
+| --- | --- |
+| `./scripts/machina` | Open the window |
+| `./scripts/machina --once` | One telemetry snapshot as JSON, no GUI |
+| `./scripts/machina --dump` | Same as `--once` |
+| `./scripts/machina --help` | CLI help |
+| `./scripts/install-desktop.sh` | Install the KDE/GNOME app-menu launcher (hardcoded path) |
+| `python -m unittest discover -s tests -v` | Stdlib unit tests (no pytest extra) |
+
+`pip install -e .` then `machina` is the same entry point (`machina.__main__:main`). Unused on this machine; `./scripts/machina` is the usual path.
+
+The window’s pages and buttons are listed in [docs/features.md](docs/features.md). Safety, watchdog, and audit files: [docs/safety.md](docs/safety.md).
+
 ## Documentation
 
 | Doc | What it is |
 | --- | --- |
 | [docs/README.md](docs/README.md) | Map of the docs |
 | [docs/getting-started.md](docs/getting-started.md) | How I run it (not a portable install guide) |
-| [docs/features.md](docs/features.md) | Use-cases in a bit more detail |
+| [docs/features.md](docs/features.md) | Window pages, buttons, and use-cases |
 | [docs/not-for-other-machines.md](docs/not-for-other-machines.md) | Hardcoded paths and limits — required reading if you are not me |
-| [docs/safety.md](docs/safety.md) | What Apply can write, watchdog, audit files |
-
-On this machine: `./scripts/machina`, or `./scripts/install-desktop.sh` once and launch from the app menu. JSON snapshot, no window: `./scripts/machina --once`.
+| [docs/safety.md](docs/safety.md) | What Apply can write, watchdog, honesty rules, audit files |
 
 ## Status
 

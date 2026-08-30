@@ -127,7 +127,10 @@ def signal_process(pid: int, sig_name: str, name: str = "") -> RuntimeResult:
     except ProcessLookupError:
         return RuntimeResult(False, "Process already gone.")
     except PermissionError:
-        result = apply_actions([{"op": "signal_process", "pid": pid, "signal": sig_name}], reason=f"signal:{sig_name}")
+        result = apply_actions(
+            [{"op": "signal_process", "pid": pid, "signal": sig_name, "name": name}],
+            reason=f"signal:{sig_name}",
+        )
         return RuntimeResult(result.ok, result.message, privileged=True, cancelled=result.cancelled)
     except OSError as exc:
         return RuntimeResult(False, str(exc))
@@ -149,7 +152,7 @@ def signal_job(job_id: str, sig_name: str) -> RuntimeResult:
         return RuntimeResult(True, f"Sent SIG{sig_name.upper()} to {job.name}.")
     except PermissionError:
         result = apply_actions(
-            [{"op": "signal_process", "pid": job.pid, "signal": sig_name}],
+            [{"op": "signal_process", "pid": job.pid, "signal": sig_name, "name": job.name}],
             reason=f"job:{sig_name}",
         )
         return RuntimeResult(result.ok, result.message, privileged=True, cancelled=result.cancelled)
@@ -187,6 +190,11 @@ def start_ollama() -> RuntimeResult:
         env["OLLAMA_NOHISTORY"] = "1"
     job = job_manager().spawn_logged("ollama serve", [binary, "serve"], ollama_log_path(), extra_env=env)
     extra = "" if history_enabled() else " (OLLAMA_NOHISTORY)"
+    if not _wait_ollama(8.0):
+        return RuntimeResult(
+            False,
+            f"Started ollama serve as pid {job.pid} but /api/version never answered.{extra}",
+        )
     return RuntimeResult(True, f"Started ollama serve as pid {job.pid} (your user, Vault models if OLLAMA_MODELS is set).{extra}")
 
 
@@ -497,11 +505,22 @@ def freetoken_unload_result() -> dict:
 
 
 def _llama_reachable(timeout: float = 0.5) -> bool:
-    ok, _, _ = http_json(f"{LLAMA_BASE}/health", timeout=timeout)
+    ok, _, _ = http_json(f"{LLAMA_BASE}/v1/models", timeout=timeout)
     if ok:
         return True
-    ok, _, _ = http_json(f"{LLAMA_BASE}/v1/models", timeout=timeout)
-    return bool(ok)
+    return _llama_health_up(timeout)
+
+
+def _llama_health_up(timeout: float) -> bool:
+    """llama.cpp /health is often plain 'OK', not JSON."""
+    import urllib.error
+    import urllib.request
+
+    try:
+        with urllib.request.urlopen(f"{LLAMA_BASE}/health", timeout=timeout) as resp:
+            return 200 <= getattr(resp, "status", 200) < 300
+    except (urllib.error.URLError, TimeoutError, OSError):
+        return False
 
 
 def _stop_llama_wait(seconds: float = 8.0) -> None:
@@ -541,6 +560,8 @@ def start_llama(*, ngl: int | None = None, params: object | None = None) -> Runt
     argv = [binary, "serve", *llama_serve_flags(saved, ngl)]
     job = job_manager().spawn_logged("llama serve", argv, llama_log_path(), extra_env=env)
     extra = f" (-ngl {ngl})" if ngl is not None else " with auto GPU fit"
+    if not _wait_llama(20.0):
+        return RuntimeResult(False, f"Started llama serve as pid {job.pid} but it never became reachable.{extra}")
     return RuntimeResult(True, f"Started llama serve as pid {job.pid}{extra}.")
 
 
@@ -615,31 +636,33 @@ def load_max_gpu(name: str, source: str = "", *, force: bool = False) -> Runtime
         cached = None if force else remembered_gpu_layers("llama.cpp", name)
         if cached:
             ngl, total = cached
-            _store_gpu_layers("llama.cpp", name, ngl, total)
             applied = _apply_llama_ngl(name, ngl, total, "remembered")
             if applied.ok:
+                _store_gpu_layers("llama.cpp", name, ngl, total)
                 return applied
         ngl, total, detail = find_llama_ngl(path)
         if ngl <= 0:
             return RuntimeResult(False, f"Could not fit any GPU layers for {name}. {detail}")
-        _store_gpu_layers("llama.cpp", name, ngl, total)
-        return _apply_llama_ngl(name, ngl, total, detail)
+        applied = _apply_llama_ngl(name, ngl, total, detail)
+        if applied.ok:
+            _store_gpu_layers("llama.cpp", name, ngl, total)
+        return applied
 
     cached = None if force else remembered_gpu_layers("ollama", name)
     if cached:
         layers, total = cached
-        _store_gpu_layers("ollama", name, layers, total)
         loaded = ollama_load(name, num_gpu=layers)
         if loaded.ok:
+            _store_gpu_layers("ollama", name, layers, total)
             shown = f"{layers}/{total}" if total else str(layers)
             return RuntimeResult(True, f"Loaded {name} with remembered num_gpu {shown}.")
     layers, total, detail = find_ollama_num_gpu(name)
     if layers <= 0:
         return RuntimeResult(False, f"Could not fit any GPU layers for {name}. {detail}")
-    _store_gpu_layers("ollama", name, layers, total)
     loaded = ollama_load(name, num_gpu=layers)
     if not loaded.ok:
         return loaded
+    _store_gpu_layers("ollama", name, layers, total)
     return RuntimeResult(True, f"Loaded {name} with num_gpu {layers}/{total} — same as `/set parameter num_gpu {layers}`. {detail}.")
 
 
@@ -673,14 +696,21 @@ def _apply_llama_ngl(name: str, ngl: int, total: int | None, detail: str) -> Run
 def _wait_llama(seconds: float) -> bool:
     deadline = time.time() + seconds
     while time.time() < deadline:
-        ok, _, _ = http_json(f"{LLAMA_BASE}/health", timeout=0.4)
-        if ok:
-            return True
-        ok, _, _ = http_json(f"{LLAMA_BASE}/v1/models", timeout=0.4)
-        if ok:
+        if _llama_reachable(0.4):
             return True
         time.sleep(0.3)
-    return False
+    return _llama_reachable(0.4)
+
+
+def _wait_ollama(seconds: float) -> bool:
+    deadline = time.time() + seconds
+    while time.time() < deadline:
+        ok, _, _ = http_json(f"{OLLAMA_BASE}/api/version", timeout=0.4)
+        if ok:
+            return True
+        time.sleep(0.2)
+    ok, _, _ = http_json(f"{OLLAMA_BASE}/api/version", timeout=0.4)
+    return bool(ok)
 
 
 def service_verb(unit: str, scope: str, verb: str) -> RuntimeResult:

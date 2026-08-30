@@ -107,7 +107,10 @@ class ApplyWorker(QThread):
         self.reason = reason
 
     def run(self) -> None:
-        self.done.emit(apply_actions(self.actions, self.reason))
+        try:
+            self.done.emit(apply_actions(self.actions, self.reason))
+        except Exception as exc:  # noqa: BLE001 — must emit so the UI can clear _busy
+            self.done.emit(ApplyResult(False, False, False, str(exc), [], {}))
 
 
 class RuntimeWorker(QThread):
@@ -138,6 +141,7 @@ class MainWindow(QMainWindow):
         self._runtime_worker: RuntimeWorker | None = None
         self._watchdog_until = 0.0
         self._busy = False
+        self._apply_reason = ""
         self._hot_streak = 0
         self._started = time.time()
         self.page_by_name: dict[str, Any] = {}
@@ -339,7 +343,11 @@ class MainWindow(QMainWindow):
         else:
             self._hot_streak = 0
         warmed_up = (time.time() - self._started) >= 4.0
-        if plan and plan["level"] == "warn":
+        cpu_t = snap.cpu.package_temp_c
+        gpu_t = getattr(snap.gpu, "temp_c", None)
+        if cfg.get("watchdog_enabled", True) and cpu_t is None and gpu_t is None:
+            self._show_banner("Watchdog idle: no package/GPU temperature.", "warn")
+        elif plan and plan["level"] == "warn":
             self._show_banner(plan["message"], "warn")
         elif (
             plan
@@ -350,7 +358,6 @@ class MainWindow(QMainWindow):
             and not self._busy
         ):
             self._show_banner(plan["message"], "critical")
-            self._watchdog_until = time.time() + float(cfg.get("watchdog_cooldown_s", 45))
             self._run_apply(plan["actions"], f"watchdog:{plan['level']}", skip_confirm=True)
         elif not plan:
             if self.banner.property("level") != "ok":
@@ -428,12 +435,14 @@ class MainWindow(QMainWindow):
             (assessment.risk == "high" and cfg.get("confirm_high", True))
             or (assessment.risk == "medium" and cfg.get("confirm_medium", True))
         )
+        self._busy = True
         if need_confirm:
             dialog = ConfirmDialog(assessment.title, assessment.summary, assessment.bullets, assessment.risk, self)
             if dialog.exec() != dialog.DialogCode.Accepted:
+                self._busy = False
                 return
-        self._busy = True
         self.busy_lbl.setText("Applying…")
+        self._apply_reason = reason
         worker = ApplyWorker(list(actions), reason)
         self._apply_worker = worker
         worker.done.connect(self._on_applied)
@@ -443,9 +452,14 @@ class MainWindow(QMainWindow):
     def _on_applied(self, result: object) -> None:
         self._busy = False
         self.busy_lbl.setText("")
+        reason = self._apply_reason
+        self._apply_reason = ""
         assert isinstance(result, ApplyResult)
+        if result.ok and str(reason).startswith("watchdog:"):
+            cfg = load_guardrails()
+            self._watchdog_until = time.time() + float(cfg.get("watchdog_cooldown_s", 45))
         if result.cancelled:
-            self.statusBar().showMessage("Authorization cancelled — nothing changed.")
+            self.statusBar().showMessage(result.message)
             return
         if result.ok:
             self.statusBar().showMessage(result.message)

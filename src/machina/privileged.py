@@ -44,6 +44,18 @@ def _all_cpu_glob(rel: str) -> list[Path]:
     return sorted(Path("/sys/devices/system/cpu").glob(f"cpu[0-9]*/cpufreq/{rel}"))
 
 
+def _comm_matches(pid: int, name: str) -> bool:
+    """True if /proc/<pid>/comm matches name (kernel comm is at most 15 chars)."""
+    try:
+        comm = Path(f"/proc/{pid}/comm").read_text(encoding="utf-8", errors="replace").strip()
+    except OSError:
+        return False
+    if not comm:
+        return False
+    base = name.rsplit("/", 1)[-1]
+    return comm in {name, base, name[:15], base[:15]}
+
+
 def apply_one(action: dict[str, Any]) -> str:
     op = action.get("op")
     if op == "set_platform_profile":
@@ -156,6 +168,9 @@ def apply_one(action: dict[str, Any]) -> str:
             raise ValueError("signal not allowed")
         if pid == os.getpid():
             raise ValueError("refusing to signal the helper itself")
+        want = str(action.get("name") or "").strip()
+        if want and not _comm_matches(pid, want):
+            raise ValueError(f"pid {pid} is not {want!r}")
         os.kill(pid, allowed[sig_name])
         return f"signal {sig_name} -> {pid}"
     if op == "systemctl":

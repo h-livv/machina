@@ -204,13 +204,13 @@ def _run_ollama_probe(name: str, num_gpu: int | None, log_path: Path, timeout: f
     _ollama_unload(name)
     time.sleep(0.35)
     offset = _log_offset(log_path)
-    ok, _err = _ollama_generate(name, num_gpu, 20, timeout)
+    _ok, _err = _ollama_generate(name, num_gpu, 20, timeout)
     chunk = _log_since(log_path, offset)
     time.sleep(0.25)
     entry = _ollama_ps(name)
     parsed = parse_offload(chunk)
-    # Resident runner is the signal. Log OOM from a recovered mmproj retry is ignored.
-    loaded = bool(entry) or (ok and parsed is not None)
+    # Resident runner is the signal. Recovered mmproj retry still shows up in /api/ps.
+    loaded = bool(entry)
     if not loaded:
         time.sleep(0.7)
     return _OllamaProbe(
@@ -386,7 +386,8 @@ def find_llama_ngl(model_path: Path, timeout: float = 120.0) -> tuple[int, int, 
         return probe_code == 0 and not is_oom_text(probe_text)
 
     best = highest_fitting(max(floor, 1), cap, probe)
-    best = max(best, floor)
+    if best < max(floor, 1):
+        return 0, total, f"binary-searched -ngl up to {cap}; none fit"
     return best, total, f"binary-searched -ngl up to {cap}"
 
 
