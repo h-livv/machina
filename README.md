@@ -19,7 +19,7 @@ Writes that need root go through `pkexec` and an allowlist. Confirmations sit in
 
 ## Which machine this is for
 
-This is **this Victus**, not a generic Linux monitor.
+This is **my Victus**, not a generic Linux monitor.
 
 It fits when the firmware is HP `hp-wmi` (those four profiles, auto/max fans), Intel P-state + RAPL in the 15–45 / 30–90 W band, and an NVIDIA GPU whose OEM cap is 60 W (hard ceiling 75 W). It fits the directories I actually have (`~/Projects`, `~/Labs`, Vault). It does **not** invent Omen Hub features this kernel does not export, and it will not flash BIOS.
 
@@ -39,7 +39,7 @@ On this machine: `./scripts/machina`. JSON snapshot, no window: `./scripts/machi
 
 ## Status
 
-This repo matches **how I run it**: this laptop, Fedora KDE, local models, projects on this disk. Paths, hardware ranges, and defaults are personal. It will not work on another machine until those hardcoded locations and custom bits are replaced. Expect sharp edges and no compatibility promise.
+This repo matches **how I run it**: my laptop, Fedora KDE, local models, projects on this disk. Paths, hardware ranges, and defaults are personal. It will not work on another machine until those hardcoded locations and custom bits are replaced. Expect sharp edges and no compatibility promise.
 
 ## Later
 
